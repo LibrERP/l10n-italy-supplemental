@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <odoo>
 
-    <record model="ir.ui.view" id="wizard_import_account_opening">
+    <record id="wizard_import_account_opening" model="ir.ui.view">
         <field name="name">Import Account Opening</field>
         <field name="model">wizard.import.account.opening</field>
         <field name="arch" type="xml">
@@ -39,7 +39,7 @@
         <field name="arch" type="xml">
             <form string="Result of Account Opening" >
                 <group>
-                        <field name="tracelog" readonly = "1"/>
+                    <field name="tracelog" readonly = "1"/>
                 </group>
                 <footer>
                     <button string="Cancel" special="cancel"/>

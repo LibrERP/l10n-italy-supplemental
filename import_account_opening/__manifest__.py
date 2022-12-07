@@ -1,7 +1,8 @@
 # © 2021-2022 SHS-AV srl (www.shs-av.com)
+# © 2022 - Didotech srl <https://www.didotech.com>
 {
     'name': 'Import account opening',
-    'version': '12.0.0.1.8',
+    'version': '12.0.0.1.9',
     'category': 'Tools',
     'author': 'SHS-AV s.r.l.',
     'website': 'https://www.zeroincombenze.it',
