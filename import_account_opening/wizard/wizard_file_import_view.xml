@@ -12,6 +12,7 @@
                                placeholder="Choose a file to import..."/>
                         <field name="filename" invisible="1"/>
                         <separator string="Parameters"/>
+                        <field name="date" />
                         <field name="journal_id"/>
                         <field name="account_id"/>
                         <field name="dry_run"/>

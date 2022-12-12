@@ -32,12 +32,14 @@ class Excel:
 
 columns = {
     'code': Excel.A,   # account code
-    'name': Excel.F,
+    'date': Excel.B,
+    # 'name': Excel.F,
     # 'customer': Excel.N,
     # 'supplier': Excel.O,
     'debit': Excel.J,
     'credit': Excel.K,
-    'ref': Excel.G,
+    'ref': Excel.D,
+    'name': Excel.G,
     'date_maturity': Excel.I,
     'vat': Excel.M
 }
@@ -60,6 +62,7 @@ class WizardImportAccountOpening(models.Model):
     )
     dry_run = fields.Boolean(string='Dry-run', default=False)
     tracelog = fields.Html('Result History')
+    date = fields.Date('Date', default='2022-12-31')
 
     @api.multi
     def html_txt(self, text, tag):
@@ -137,6 +140,8 @@ class WizardImportAccountOpening(models.Model):
     def import_xls(self):
         self.tracelog = ''
         file_datas = self.get_data()
+        too_many = []
+        not_found = []
         for partner_name, datas in file_datas.items():
             partner_name = self.sanitize(partner_name)
             partner = self.env['res.partner'].search([
@@ -157,8 +162,18 @@ class WizardImportAccountOpening(models.Model):
                 self.create_accounting_record(partner, datas)
             elif partner:
                 _logger.info(f'Error: Too many partners "{partner_name}"')
+                too_many.append(partner_name)
             else:
                 _logger.info(f'Error: No partners "{partner_name}"')
+                not_found.append(partner_name)
+
+        for partner in too_many:
+            _logger.info(f"Error: Too many: {partner}")
+
+        for partner in not_found:
+            _logger.info(f"Error: Not found: {partner}")
+
+        _logger.info("================= End of Import =================")
 
         return {
             'name': 'Import result',
@@ -178,18 +193,6 @@ class WizardImportAccountOpening(models.Model):
     def create_accounting_record(self, partner, datas):
         move_model = 'account.move'
         company_id = self.env.user.company_id.id
-        move_line_model = 'account.move.line'
-
-        if not self.dry_run:
-            move = self.env[move_model].create(
-                {
-                    'company_id': company_id,
-                    'journal_id': self.journal_id.id,
-                    'move_type': 'other',
-                    'type': 'entry',
-                    'ref': 'apertura conti',
-                }
-            )
 
         tracelog = self.html_txt(_(f'Import account entries for {partner.name}'), 'h3')
         tracelog += self.html_txt('', 'table')
@@ -197,7 +200,7 @@ class WizardImportAccountOpening(models.Model):
 
         total_debit = 0.0
         total_credit = 0.0
-
+        move_lines = []
         for numrec, vals in enumerate(datas, start=1):
             vals['partner_id'] = partner.id
             del(vals['vat'])
@@ -207,34 +210,43 @@ class WizardImportAccountOpening(models.Model):
                 ('company_id', '=', company_id)
             ]
             vals['account_id'], html = self.get_account_code(acc_domain, vals, numrec)
+            vals['date'] = vals['date'].date()
             tracelog += html
 
             if not vals or self.dry_run:
                 continue
             else:
-                vals['move_id'] = move.id
-                try:
-                    self.env[move_line_model].with_context(
-                        check_move_validity=False
-                    ).create(vals)
-                    total_debit += vals.get('debit', 0.0)
-                    total_credit += vals.get('credit', 0.0)
-                except BaseException as e:
-                    tracelog += self.html_add_row(['%s' % numrec, '', vals.get('name', ''), '', e])
-                    break
+                move_lines.append((0, False, vals))
+                total_debit += vals.get('debit', 0.0)
+                total_credit += vals.get('credit', 0.0)
 
         if not self.dry_run:
             vals = {
-                'move_id': move.id,
                 'account_id': self.account_id.id,
                 'name': 'risultato di esercizio',
+                'date_maturity': '2022-10-31'
             }
             if total_credit > total_debit:
                 vals['debit'] = total_credit - total_debit
             else:
                 vals['credit'] = total_debit - total_credit
+            move_lines.append((0, False, vals))
 
-            self.env[move_line_model].create(vals)
+            move = self.env[move_model].create(
+                {
+                    'company_id': company_id,
+                    'journal_id': self.journal_id.id,
+                    'move_type': 'other',
+                    'type': 'entry',
+                    'ref': 'apertura conti',
+                    'line_ids': move_lines,
+                }
+            )
+            move.write({
+                'move_type': 'other',
+                'ref': 'apertura conti',
+                'date': self.date
+            })
 
         tracelog += self.html_txt('', '/table')
         self.tracelog += tracelog
